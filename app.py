@@ -3,7 +3,7 @@ from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 from datetime import datetime
 
-st.set_page_config(page_title="Control Documental", layout="wide")
+st.set_page_config(page_title="Control Documental QA", layout="wide")
 st.title("📦 Sistema Estricto de Control de Carpetas")
 
 # 1. MATRIZ DE SUBSISTEMAS ESTANDARIZADA
@@ -34,7 +34,6 @@ ss_techint_belfi = [
     "7130-F01-001", "7130-F01-002"
 ]
 
-# Consolidar, ordenar y agregar compuerta lógica de contingencia
 ss_master = sorted(list(set(ss_ide + ss_techint_belfi))) + ["OTRO (Ingreso Manual)"]
 
 # 2. CONEXIÓN Y EXTRACCIÓN DE DATOS
@@ -51,17 +50,17 @@ except Exception as e:
 
 # 3. CONTROLADOR DE INTERFAZ
 with st.sidebar:
-    st.header("Panel de Control")
-    modo = st.radio("Acción requerida:", ["1. Ingresar Nuevo Registro", "2. Editar Registro Existente", "3. Panel de Visualización"])
-    if st.button("🔄 Forzar Sincronización Nube"):
+    st.header("Panel de Operaciones")
+    modo = st.radio("Fase de trabajo:", ["1. Ingreso Documental", "2. Panel de Auditoría y Edición"])
+    if st.button("🔄 Forzar Sincronización"):
         st.rerun()
 
 # ==========================================
 # MÓDULO 1: INGRESO NUEVO
 # ==========================================
-if modo == "1. Ingresar Nuevo Registro":
+if modo == "1. Ingreso Documental":
     with st.form("registro_form", clear_on_submit=True):
-        st.subheader("Ingreso de Trazabilidad Documental")
+        st.subheader("Ingreso Inicial de Trazabilidad")
         col1, col2, col3 = st.columns(3)
         
         with col1:
@@ -78,10 +77,9 @@ if modo == "1. Ingresar Nuevo Registro":
         with col3:
             comentario = st.text_area("Registro de Modificaciones / Faltantes")
             
-        submit = st.form_submit_button("Registrar en Base de Datos")
+        submit = st.form_submit_button("Registrar Nuevo Lote")
 
     if submit:
-        # Resolución de la compuerta lógica del Subsistema
         subsistema_final = subsistema_manual.strip().upper() if subsistema_sel == "OTRO (Ingreso Manual)" else subsistema_sel
         
         if not subsistema_final or not responsable or not tomo:
@@ -101,86 +99,21 @@ if modo == "1. Ingresar Nuevo Registro":
             df_base = data.dropna(how="all") if data is not None else pd.DataFrame()
             df_actualizado = pd.concat([df_base, nuevo_registro], ignore_index=True)
             conn.update(data=df_actualizado)
-            st.success("✅ Protocolo registrado con éxito.")
+            st.success("✅ Protocolo inicial registrado con éxito.")
             st.balloons()
 
 # ==========================================
-# MÓDULO 2: EDICIÓN EXISTENTE
+# MÓDULO 2: PANEL MAESTRO (Visualización, Edición y Eliminación)
 # ==========================================
-elif modo == "2. Editar Registro Existente":
-    st.subheader("Auditoría y Corrección de Registros")
+elif modo == "2. Panel de Auditoría y Edición":
+    st.subheader("Auditoría General y Control de Registros")
+    
     df_limpio = data.dropna(subset=["Subsistema"]) if data is not None and not data.empty else pd.DataFrame()
     
     if df_limpio.empty:
-        st.warning("La base de datos está vacía. No hay variables para auditar.")
+        st.warning("La base de datos está vacía.")
     else:
-        # Crear un selector legible para ubicar el registro exacto
-        opciones_idx = df_limpio.index.tolist()
-        def formato_selector(i):
-            return f"[{df_limpio.loc[i, 'Estado']}] {df_limpio.loc[i, 'Subsistema']} | {df_limpio.loc[i, 'Tipo']} | Tomo: {df_limpio.loc[i, 'Tomo']}"
-        
-        idx_editar = st.selectbox("Selecciona el registro específico que requiere modificación:", opciones_idx, format_func=formato_selector)
-        
-        # Extraer variables actuales para pre-llenar el formulario
-        fila_actual = df_limpio.loc[idx_editar]
-        
-        # Determinar índice del selectbox para el subsistema actual
-        try:
-            ss_index_actual = ss_master.index(fila_actual["Subsistema"])
-        except ValueError:
-            ss_index_actual = len(ss_master) - 1 # Cae en "OTRO"
-
-        with st.form("edit_form"):
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                edit_sub_sel = st.selectbox("ID Subsistema", ss_master, index=ss_index_actual)
-                edit_sub_man = st.text_input("Ingreso Manual", value=fila_actual["Subsistema"] if ss_index_actual == len(ss_master)-1 else "")
-                
-                tipo_options = ["CRP", "PRECOM"]
-                edit_tipo = st.selectbox("Categoría", tipo_options, index=tipo_options.index(fila_actual["Tipo"]) if fila_actual["Tipo"] in tipo_options else 0)
-                edit_tomo = st.text_input("Tomo N° / Rango", value=str(fila_actual["Tomo"]))
-                
-            with col2:
-                subc_options = ["TECHINT", "IDE", "BELFI", "Syncore"]
-                edit_subc = st.selectbox("Subcontrato", subc_options, index=subc_options.index(fila_actual["Subcontrato"]) if fila_actual["Subcontrato"] in subc_options else 0)
-                edit_resp = st.text_input("Responsable", value=str(fila_actual["Responsable"]))
-                
-                estado_options = ["Entregado por Subcliente", "Falta Escanear", "En Revisión QA", "Observado/Rechazado", "OK"]
-                edit_est = st.selectbox("Estado Operativo", estado_options, index=estado_options.index(fila_actual["Estado"]) if fila_actual["Estado"] in estado_options else 0)
-                
-            with col3:
-                edit_coment = st.text_area("Comentarios", value=str(fila_actual["Comentarios"] if pd.notna(fila_actual["Comentarios"]) else ""))
-                
-            submit_edit = st.form_submit_button("Sobrescribir Registro")
-            
-        if submit_edit:
-            sub_final_edit = edit_sub_man.strip().upper() if edit_sub_sel == "OTRO (Ingreso Manual)" else edit_sub_sel
-            
-            # Clonar el dataframe para inyectar la modificación en la fila exacta
-            df_actualizado = df_limpio.copy()
-            df_actualizado.loc[idx_editar, "Subsistema"] = sub_final_edit
-            df_actualizado.loc[idx_editar, "Tipo"] = edit_tipo
-            df_actualizado.loc[idx_editar, "Tomo"] = edit_tomo.strip()
-            df_actualizado.loc[idx_editar, "Subcontrato"] = edit_subc
-            df_actualizado.loc[idx_editar, "Responsable"] = edit_resp.strip().upper()
-            df_actualizado.loc[idx_editar, "Estado"] = edit_est
-            df_actualizado.loc[idx_editar, "Fecha_Registro"] = datetime.now().strftime("%Y-%m-%d %H:%M") + " (Editado)"
-            df_actualizado.loc[idx_editar, "Comentarios"] = edit_coment.strip()
-            
-            conn.update(data=df_actualizado)
-            st.success("✅ Modificación estructural aplicada a la base de datos.")
-            st.rerun()
-
-# ==========================================
-# MÓDULO 3: VISUALIZACIÓN Y AUDITORÍA
-# ==========================================
-else:
-    st.subheader("Auditoría de Subsistemas Pendientes y OK")
-    df_limpio = data.dropna(subset=["Subsistema"]) if data is not None and not data.empty else pd.DataFrame()
-    
-    if df_limpio.empty:
-        st.warning("Base de datos limpia o sin formato correcto detectado.")
-    else:
+        # Métricas
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("Total Movimientos", len(df_limpio))
         c2.metric("Lotes OK", len(df_limpio[df_limpio["Estado"] == "OK"]))
@@ -188,10 +121,44 @@ else:
         c4.metric("Lotes sin Escanear", len(df_limpio[df_limpio["Estado"] == "Falta Escanear"]))
 
         st.markdown("---")
-        filtro_sub = st.text_input("🔍 Búsqueda rigurosa por TAG:")
-        if filtro_sub:
-            df_vis = df_limpio[df_limpio["Subsistema"].astype(str).str.contains(filtro_sub.upper(), na=False)]
-        else:
-            df_vis = df_limpio
+        st.info("💡 **Instrucción de eliminación:** Para borrar una fila, selecciónala marcando el cuadro a su izquierda y presiona 'Delete' en tu teclado. Luego presiona el botón de guardado abajo.")
+        
+        # Data Editor con num_rows="dynamic" para permitir ELIMINAR filas
+        df_editado = st.data_editor(
+            df_limpio,
+            use_container_width=True,
+            num_rows="dynamic", # Permite borrar filas existentes
+            hide_index=True,
+            column_config={
+                "Subsistema": st.column_config.SelectboxColumn("Subsistema", options=ss_master, required=True),
+                "Tipo": st.column_config.SelectboxColumn("Tipo", options=["CRP", "PRECOM"], required=True),
+                "Tomo": st.column_config.TextColumn("Tomo N° / Rango", required=True),
+                "Subcontrato": st.column_config.SelectboxColumn("Subcontrato", options=["TECHINT", "IDE", "BELFI", "Syncore"], required=True),
+                "Responsable": st.column_config.TextColumn("Responsable", required=True),
+                "Estado": st.column_config.SelectboxColumn("Estado Operativo", options=["Entregado por Subcliente", "Falta Escanear", "En Revisión QA", "Observado/Rechazado", "OK"], required=True),
+                "Fecha_Registro": st.column_config.TextColumn("Última Actualización", disabled=True),
+                "Comentarios": st.column_config.TextColumn("Comentarios")
+            }
+        )
 
-        st.dataframe(df_vis, use_container_width=True, hide_index=True)
+        if st.button("💾 Auditar y Guardar Cambios en la Nube", type="primary"):
+            # Lógica de detección de cambios o eliminación
+            if len(df_editado) != len(df_limpio):
+                # Caso: Se eliminaron registros
+                conn.update(data=df_editado)
+                st.success(f"✅ Se eliminaron {len(df_limpio) - len(df_editado)} registro(s). Base de datos sincronizada.")
+                st.rerun()
+            else:
+                # Caso: Solo se editaron valores
+                df_limpio_str = df_limpio.astype(str)
+                df_editado_str = df_editado.astype(str)
+                cambios = df_limpio_str.compare(df_editado_str)
+                
+                if not cambios.empty:
+                    indices_modificados = cambios.index
+                    df_editado.loc[indices_modificados, "Fecha_Registro"] = datetime.now().strftime("%Y-%m-%d %H:%M") + " (Editado)"
+                    conn.update(data=df_editado)
+                    st.success(f"✅ Se guardaron {len(indices_modificados)} modificaciones.")
+                    st.rerun()
+                else:
+                    st.info("No se detectaron variaciones.")
