@@ -35,8 +35,6 @@ ss_techint_belfi = [
 ]
 
 ss_master = sorted(list(set(ss_ide + ss_techint_belfi))) + ["OTRO (Ingreso Manual)"]
-
-# ESTADOS OFICIALES ACTUALIZADOS
 estados_oficiales = ["OK", "Falta firma", "En revision", "Faltan PRT", "Falta escanear"]
 
 # 2. CONEXIÓN Y EXTRACCIÓN DE DATOS
@@ -56,7 +54,7 @@ with st.sidebar:
     st.header("Panel de Operaciones")
     modo = st.radio("Fase de trabajo:", ["1. Ingreso Documental", "2. Panel de Auditoría y Edición"])
     st.markdown("---")
-    if st.button("🔄 Sincronizar"):
+    if st.button("🔄 Sincronizar Nube"):
         st.rerun()
 
 # ==========================================
@@ -116,7 +114,6 @@ else:
     else:
         df_limpio = df_limpio.fillna("").astype(str).replace(["nan", "None"], "")
         
-        # PANEL DE MÉTRICAS Y DESCARGA
         c1, c2, c3, c_down = st.columns([1,1,1,1.5])
         c1.metric("Total", len(df_limpio))
         c2.metric("OK", len(df_limpio[df_limpio["Estado"] == "OK"]))
@@ -128,20 +125,23 @@ else:
 
         st.markdown("---")
         
-        # FILTRO REACTIVO
-        buscador = st.text_input("🔍 Filtro: Escribe el SS y presiona Enter", "")
+        # FILTRO REACTIVO OPTIMIZADO PARA MÓVIL (No requiere Enter)
+        # Extraemos solo los SS que existen actualmente en la base de datos para no saturar el filtro
+        ss_registrados = sorted(df_limpio["Subsistema"].unique().tolist())
+        opciones_filtro = ["📋 MOSTRAR TODOS LOS REGISTROS"] + ss_registrados
         
-        if buscador:
-            df_vis = df_limpio[df_limpio["Subsistema"].str.contains(buscador.upper(), na=False)].copy()
+        buscador = st.selectbox("🔍 Búsqueda Rápida: Toca aquí y escribe el SS para filtrar al instante", opciones_filtro)
+        
+        if buscador != "📋 MOSTRAR TODOS LOS REGISTROS":
+            df_vis = df_limpio[df_limpio["Subsistema"] == buscador].copy()
         else:
             df_vis = df_limpio.copy()
 
         if not df_vis.empty:
-            # EDITOR DE DATOS CON FILAS FIJAS (Impide agregar SS directo en la tabla)
             df_editado = st.data_editor(
                 df_vis,
                 use_container_width=True,
-                num_rows="fixed", # SOLO EDITAR, NO AGREGAR
+                num_rows="fixed",
                 hide_index=True,
                 column_config={
                     "Subsistema": st.column_config.SelectboxColumn("Subsistema", options=ss_master, required=True),
