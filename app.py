@@ -2,6 +2,7 @@ import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 from datetime import datetime
+from st_keyup import st_keyup
 
 st.set_page_config(page_title="Control TOP", layout="wide")
 st.title("Sistema de Control de Carpetas TOP")
@@ -125,15 +126,12 @@ else:
 
         st.markdown("---")
         
-        # FILTRO REACTIVO OPTIMIZADO PARA MÓVIL (No requiere Enter)
-        # Extraemos solo los SS que existen actualmente en la base de datos para no saturar el filtro
-        ss_registrados = sorted(df_limpio["Subsistema"].unique().tolist())
-        opciones_filtro = ["📋 MOSTRAR TODOS LOS REGISTROS"] + ss_registrados
+        # FILTRO REACTIVO DE ALTA VELOCIDAD (st_keyup intercepta cada tecleo en vivo)
+        buscador = st_keyup("🔍 Filtro en vivo: Escribe para buscar (sin presionar Enter)", key="buscador_ss")
         
-        buscador = st.selectbox("🔍 Búsqueda Rápida: Toca aquí y escribe el SS para filtrar al instante", opciones_filtro)
-        
-        if buscador != "📋 MOSTRAR TODOS LOS REGISTROS":
-            df_vis = df_limpio[df_limpio["Subsistema"] == buscador].copy()
+        # Lógica de filtrado en tiempo real
+        if buscador:
+            df_vis = df_limpio[df_limpio["Subsistema"].str.contains(buscador.upper(), na=False)].copy()
         else:
             df_vis = df_limpio.copy()
 
