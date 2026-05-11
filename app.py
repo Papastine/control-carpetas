@@ -36,7 +36,7 @@ ss_techint_belfi = [
 
 ss_master = sorted(list(set(ss_ide + ss_techint_belfi))) + ["OTRO (Ingreso Manual)"]
 
-# NUEVOS ESTADOS EXIGIDOS
+# ESTADOS OFICIALES ACTUALIZADOS
 estados_oficiales = ["OK", "Falta firma", "En revision", "Faltan PRT", "Falta escanear"]
 
 # 2. CONEXIÓN Y EXTRACCIÓN DE DATOS
@@ -48,16 +48,15 @@ def cargar_datos():
 try:
     data = cargar_datos()
 except Exception as e:
-    st.error(f"Falla de conexión de lectura: {e}")
+    st.error(f"Error de conexión: {e}")
     st.stop()
 
 # 3. CONTROLADOR DE INTERFAZ
 with st.sidebar:
     st.header("Panel de Operaciones")
     modo = st.radio("Fase de trabajo:", ["1. Ingreso Documental", "2. Panel de Auditoría y Edición"])
-    
     st.markdown("---")
-    if st.button("🔄 Forzar Sincronización"):
+    if st.button("🔄 Sincronizar"):
         st.rerun()
 
 # ==========================================
@@ -65,30 +64,29 @@ with st.sidebar:
 # ==========================================
 if modo == "1. Ingreso Documental":
     with st.form("registro_form", clear_on_submit=True):
-        st.subheader("Ingreso Inicial de Trazabilidad")
+        st.subheader("Ingreso de Trazabilidad")
         col1, col2, col3 = st.columns(3)
         
         with col1:
-            subsistema_sel = st.selectbox("ID Subsistema (Matriz Oficial)", ss_master)
-            subsistema_manual = st.text_input("Ingreso Manual (Solo si elegiste 'OTRO')")
-            tipo = st.selectbox("Categoría de Carpeta", ["CRP", "PRECOM"])
-            tomo = st.text_input("Tomo N° / Rango (ej: 1 al 4, 5, 6-7)")
+            subsistema_sel = st.selectbox("ID Subsistema", ss_master)
+            subsistema_manual = st.text_input("Ingreso Manual (Solo si es 'OTRO')")
+            tipo = st.selectbox("Categoría", ["CRP", "PRECOM"])
+            tomo = st.text_input("Tomo N° / Rango")
             
         with col2:
-            subcontrato = st.selectbox("Empresa Subcontrato (Emisor)", ["TECHINT", "IDE", "BELFI", "Syncore"])
-            responsable = st.text_input("Responsable (Receptor/Revisor)")
-            estado = st.selectbox("Estado Operativo", estados_oficiales)
+            subcontrato = st.selectbox("Emisor", ["TECHINT", "IDE", "BELFI", "Syncore"])
+            responsable = st.text_input("Responsable")
+            estado = st.selectbox("Estado", estados_oficiales)
             
         with col3:
-            comentario = st.text_area("Registro de Modificaciones / Faltantes")
+            comentario = st.text_area("Comentarios")
             
-        submit = st.form_submit_button("Registrar Nuevo Lote")
+        submit = st.form_submit_button("Registrar")
 
     if submit:
         subsistema_final = subsistema_manual.strip().upper() if subsistema_sel == "OTRO (Ingreso Manual)" else subsistema_sel
-        
         if not subsistema_final or not responsable or not tomo:
-            st.error("⚠️ Error Crítico: Los campos Subsistema, Tomo(s) y Responsable son obligatorios.")
+            st.error("Campos obligatorios faltantes.")
         else:
             nuevo_registro = pd.DataFrame([{
                 "Subsistema": subsistema_final,
@@ -100,113 +98,75 @@ if modo == "1. Ingreso Documental":
                 "Fecha_Registro": datetime.now().strftime("%Y-%m-%d %H:%M"),
                 "Comentarios": str(comentario).strip()
             }])
-            
             df_base = data.dropna(how="all") if data is not None else pd.DataFrame()
             df_actualizado = pd.concat([df_base, nuevo_registro], ignore_index=True)
             conn.update(data=df_actualizado)
-            st.success("✅ Protocolo inicial registrado con éxito.")
-            st.balloons()
+            st.success("Registrado.")
+            st.rerun()
 
 # ==========================================
-# MÓDULO 2: PANEL MAESTRO (Visualización, Edición y Eliminación)
+# MÓDULO 2: PANEL MAESTRO (Visualización y Edición)
 # ==========================================
-elif modo == "2. Panel de Auditoría y Edición":
-    st.subheader("Auditoría General y Control de Registros")
-    
+else:
+    st.subheader("Auditoría y Edición")
     df_limpio = data.dropna(subset=["Subsistema"]) if data is not None and not data.empty else pd.DataFrame()
     
     if df_limpio.empty:
-        st.warning("La base de datos está vacía.")
+        st.warning("Sin datos.")
     else:
-        # Sanitización de datos crudos
         df_limpio = df_limpio.fillna("").astype(str).replace(["nan", "None"], "")
-
-        # Incorporar estados heredados para que la UI no colapse con registros antiguos
-        estados_db = df_limpio["Estado"].unique().tolist()
-        estados_combinados = sorted(list(set(estados_oficiales + estados_db)))
-
-        # Panel Superior: Métricas y Descarga
-        col_met1, col_met2, col_met3, col_met4, col_down = st.columns([1,1,1,1,1.5])
-        col_met1.metric("Total Movimientos", len(df_limpio))
-        col_met2.metric("Lotes OK", len(df_limpio[df_limpio["Estado"] == "OK"]))
-        col_met3.metric("En Revisión", len(df_limpio[df_limpio["Estado"] == "En revision"]))
-        col_met4.metric("Falta Escanear", len(df_limpio[df_limpio["Estado"] == "Falta escanear"]))
         
-        with col_down:
+        # PANEL DE MÉTRICAS Y DESCARGA
+        c1, c2, c3, c_down = st.columns([1,1,1,1.5])
+        c1.metric("Total", len(df_limpio))
+        c2.metric("OK", len(df_limpio[df_limpio["Estado"] == "OK"]))
+        c3.metric("En revisión", len(df_limpio[df_limpio["Estado"] == "En revision"]))
+        
+        with c_down:
             csv_data = df_limpio.to_csv(index=False, sep=";", encoding="utf-8-sig")
-            st.download_button(
-                label="📥 Descargar Excel (CSV)",
-                data=csv_data,
-                file_name=f"Control_Carpetas_{datetime.now().strftime('%d-%m-%Y')}.csv",
-                mime="text/csv",
-                use_container_width=True
-            )
+            st.download_button("📥 Descargar Excel", csv_data, f"Control_TOP_{datetime.now().strftime('%d-%m-%Y')}.csv", "text/csv", use_container_width=True)
 
         st.markdown("---")
         
-        # BUSCADOR EN TIEMPO REAL (Soluciona el problema móvil)
-        buscador = st.text_input("🔍 Filtro en Vivo: Escribe el TAG o parte del Subsistema para buscar (Optimizado para celular)", "")
+        # FILTRO REACTIVO
+        buscador = st.text_input("🔍 Filtro: Escribe el SS y presiona Enter", "")
         
-        # Filtrado del DataFrame
         if buscador:
             df_vis = df_limpio[df_limpio["Subsistema"].str.contains(buscador.upper(), na=False)].copy()
         else:
             df_vis = df_limpio.copy()
 
-        if df_vis.empty:
-            st.info("No se encontraron registros para la búsqueda ingresada.")
-        else:
-            st.info("💡 **Tips Celular:** 1. Usa el buscador arriba para evitar hacer scroll. 2. Marca la casilla izquierda de una fila para resaltarla. 3. Para borrar, selecciona y presiona el ícono de papelera (Delete).")
-            
-            # Editor de Datos (Trabaja sobre la vista filtrada)
+        if not df_vis.empty:
+            # EDITOR DE DATOS CON FILAS FIJAS (Impide agregar SS directo en la tabla)
             df_editado = st.data_editor(
                 df_vis,
                 use_container_width=True,
-                num_rows="dynamic",
-                hide_index=False, # Muestra el índice numérico para facilitar la identificación
+                num_rows="fixed", # SOLO EDITAR, NO AGREGAR
+                hide_index=True,
                 column_config={
                     "Subsistema": st.column_config.SelectboxColumn("Subsistema", options=ss_master, required=True),
                     "Tipo": st.column_config.SelectboxColumn("Tipo", options=["CRP", "PRECOM"], required=True),
-                    "Tomo": st.column_config.TextColumn("Tomo N° / Rango", required=True),
-                    "Subcontrato": st.column_config.SelectboxColumn("Subcontrato", options=["TECHINT", "IDE", "BELFI", "Syncore"], required=True),
+                    "Tomo": st.column_config.TextColumn("Tomo", required=True),
+                    "Subcontrato": st.column_config.SelectboxColumn("Emisor", options=["TECHINT", "IDE", "BELFI", "Syncore"], required=True),
                     "Responsable": st.column_config.TextColumn("Responsable", required=True),
-                    "Estado": st.column_config.SelectboxColumn("Estado Operativo", options=estados_combinados, required=True),
-                    "Fecha_Registro": st.column_config.TextColumn("Última Actualización", disabled=True),
+                    "Estado": st.column_config.SelectboxColumn("Estado", options=estados_oficiales, required=True),
+                    "Fecha_Registro": st.column_config.TextColumn("Fecha", disabled=True),
                     "Comentarios": st.column_config.TextColumn("Comentarios")
                 }
             )
 
-            # Botón Maestro de Guardado (Arquitectura segura para vistas filtradas)
-            if st.button("💾 Auditar y Guardar Cambios", type="primary"):
+            if st.button("💾 Guardar Cambios", type="primary"):
                 df_editado = df_editado.fillna("").astype(str).replace(["nan", "None"], "")
-                
-                # Proceso de Integración a la Base Maestra
                 hubo_cambios = False
                 
-                # 1. Eliminar filas que se borraron en la UI
-                indices_borrados = set(df_vis.index) - set(df_editado.index)
-                if indices_borrados:
-                    df_limpio = df_limpio.drop(index=indices_borrados)
-                    hubo_cambios = True
-                
-                # 2. Actualizar celdas modificadas y registrar la fecha real
                 for idx in df_editado.index:
                     if idx in df_limpio.index:
-                        # Comparamos fila por fila para ver si algo cambió
                         if not df_limpio.loc[idx].equals(df_editado.loc[idx]):
                             df_limpio.loc[idx] = df_editado.loc[idx]
                             df_limpio.loc[idx, "Fecha_Registro"] = datetime.now().strftime("%Y-%m-%d %H:%M") + " (Editado)"
                             hubo_cambios = True
-                    else:
-                        # Se agregó una fila nueva desde el panel de edición
-                        nueva_fila = df_editado.loc[[idx]]
-                        nueva_fila["Fecha_Registro"] = datetime.now().strftime("%Y-%m-%d %H:%M")
-                        df_limpio = pd.concat([df_limpio, nueva_fila])
-                        hubo_cambios = True
 
                 if hubo_cambios:
                     conn.update(data=df_limpio)
-                    st.success("✅ Estructura sincronizada correctamente. La base maestra ha sido actualizada.")
+                    st.success("Sincronizado.")
                     st.rerun()
-                else:
-                    st.info("No se detectaron variaciones en la estructura.")
