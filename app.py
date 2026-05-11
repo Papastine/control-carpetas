@@ -88,12 +88,12 @@ if modo == "1. Ingreso Documental":
             nuevo_registro = pd.DataFrame([{
                 "Subsistema": subsistema_final,
                 "Tipo": tipo,
-                "Tomo": tomo.strip(),
+                "Tomo": str(tomo).strip(),
                 "Subcontrato": subcontrato,
-                "Responsable": responsable.strip().upper(),
+                "Responsable": str(responsable).strip().upper(),
                 "Estado": estado,
                 "Fecha_Registro": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                "Comentarios": comentario.strip()
+                "Comentarios": str(comentario).strip()
             }])
             
             df_base = data.dropna(how="all") if data is not None else pd.DataFrame()
@@ -108,11 +108,19 @@ if modo == "1. Ingreso Documental":
 elif modo == "2. Panel de Auditoría y Edición":
     st.subheader("Auditoría General y Control de Registros")
     
+    # Sanitización estricta de la base de datos
     df_limpio = data.dropna(subset=["Subsistema"]) if data is not None and not data.empty else pd.DataFrame()
     
     if df_limpio.empty:
         st.warning("La base de datos está vacía.")
     else:
+        # Forzar todos los tipos de datos a String (Texto) para evitar colisiones en st.data_editor
+        df_limpio = df_limpio.fillna("")
+        df_limpio = df_limpio.astype(str)
+        # Eliminar literales 'nan' en caso de conversiones extrañas de Pandas
+        df_limpio = df_limpio.replace("nan", "")
+        df_limpio = df_limpio.replace("None", "")
+
         # Métricas
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("Total Movimientos", len(df_limpio))
@@ -123,11 +131,11 @@ elif modo == "2. Panel de Auditoría y Edición":
         st.markdown("---")
         st.info("💡 **Instrucción de eliminación:** Para borrar una fila, selecciónala marcando el cuadro a su izquierda y presiona 'Delete' en tu teclado. Luego presiona el botón de guardado abajo.")
         
-        # Data Editor con num_rows="dynamic" para permitir ELIMINAR filas
+        # Data Editor con num_rows="dynamic"
         df_editado = st.data_editor(
             df_limpio,
             use_container_width=True,
-            num_rows="dynamic", # Permite borrar filas existentes
+            num_rows="dynamic",
             hide_index=True,
             column_config={
                 "Subsistema": st.column_config.SelectboxColumn("Subsistema", options=ss_master, required=True),
@@ -142,17 +150,17 @@ elif modo == "2. Panel de Auditoría y Edición":
         )
 
         if st.button("💾 Auditar y Guardar Cambios en la Nube", type="primary"):
-            # Lógica de detección de cambios o eliminación
+            # Sanitizar nuevamente el editado por seguridad antes de comparar
+            df_editado = df_editado.fillna("").astype(str).replace("nan", "").replace("None", "")
+            
             if len(df_editado) != len(df_limpio):
-                # Caso: Se eliminaron registros
+                # Se eliminaron o agregaron registros desde la tabla
                 conn.update(data=df_editado)
-                st.success(f"✅ Se eliminaron {len(df_limpio) - len(df_editado)} registro(s). Base de datos sincronizada.")
+                st.success("✅ Modificación estructural detectada. Base de datos sincronizada.")
                 st.rerun()
             else:
-                # Caso: Solo se editaron valores
-                df_limpio_str = df_limpio.astype(str)
-                df_editado_str = df_editado.astype(str)
-                cambios = df_limpio_str.compare(df_editado_str)
+                # Solo edición de celdas
+                cambios = df_limpio.compare(df_editado)
                 
                 if not cambios.empty:
                     indices_modificados = cambios.index
@@ -161,4 +169,4 @@ elif modo == "2. Panel de Auditoría y Edición":
                     st.success(f"✅ Se guardaron {len(indices_modificados)} modificaciones.")
                     st.rerun()
                 else:
-                    st.info("No se detectaron variaciones.")
+                    st.info("No se detectaron variaciones en la estructura de datos.")
