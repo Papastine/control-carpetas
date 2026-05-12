@@ -12,6 +12,9 @@ st.set_page_config(page_title="Control TOP QA", layout="wide")
 st.markdown("""
     <style>
     .main .block-container { padding-top: 2rem; max-width: 98%; }
+    div[data-testid="stMetricValue"] { font-size: 1.8rem; font-weight: bold; }
+    div[data-testid="stMetricLabel"] { font-weight: 600; text-transform: uppercase; color: #555; }
+    hr { margin-top: 1em; margin-bottom: 1em; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -92,7 +95,7 @@ if modo == "01. Ingreso Documental":
         with col1:
             subsistema_sel = st.selectbox("ID Subsistema", ss_master)
             
-            # Compuerta lógica: Solo despliega input manual si se requiere
+            # Compuerta lógica: Despliega input manual si se requiere
             if subsistema_sel == "OTRO (INGRESO MANUAL)":
                 subsistema_manual = st.text_input("Ingreso Manual de Subsistema")
             else:
@@ -162,7 +165,7 @@ else:
         
         # --- BUSCADOR TÁCTICO INMEDIATO ---
         st.subheader("Buscador de Subsistemas")
-        buscador_txt = st_keyup("Escriba el Subsistema para filtrar la tabla al instante:", key="buscador_ss")
+        buscador_txt = st_keyup("Escriba el Subsistema para aislar el registro:", key="buscador_ss")
         st.divider()
 
         # --- PANEL MÉTRICO ---
@@ -177,7 +180,7 @@ else:
         st.write("")
 
         # --- FILTROS DE VISTA SECUNDARIOS ---
-        with st.expander("Filtros Adicionales (Estado, Empresa, Tipo)"):
+        with st.expander("Desplegar Filtros Secundarios (Estado, Empresa, Tipo)"):
             f_col1, f_col2, f_col3 = st.columns(3)
             with f_col1:
                 filtro_estado = st.selectbox("Filtrar por Estado", ["TODOS"] + estados_oficiales)
@@ -199,28 +202,24 @@ else:
         if filtro_tipo != "TODOS":
             df_vis = df_vis[df_vis["Tipo"] == filtro_tipo]
 
-        # --- INTERFAZ ERP: EDICIÓN Y ELIMINACIÓN ---
+        # --- INTERFAZ DE EDICIÓN SEGURA ---
         st.write("### Matriz de Auditoría de Datos")
-        st.info("Para modificar un valor, haga doble clic en la celda. Para **ELIMINAR** un registro, marque la casilla '[ 🗑️ BORRAR ]' y presione Sincronizar Cambios.")
+        st.info("Doble clic en la celda para editar. Las columnas de identificación (Subsistema, Tipo, Tomo) están bloqueadas para prevenir arrastres accidentales.")
         
         if not df_vis.empty:
-            # INYECCIÓN DE LA COLUMNA BOOLEANA DE ELIMINACIÓN
-            df_vis.insert(0, "ELIMINAR", False)
-
             df_editado = st.data_editor(
                 df_vis,
                 use_container_width=True,
                 num_rows="fixed",
-                hide_index=False, # SE MANTIENE EL ÍNDICE NATIVO PARA PERMITIR RESALTADO DE FILA
+                hide_index=True,
                 column_config={
-                    "ELIMINAR": st.column_config.CheckboxColumn("🗑️ BORRAR", default=False, width="small"),
-                    "Subsistema": st.column_config.SelectboxColumn("Subsistema", options=ss_master, required=True),
-                    "Tipo": st.column_config.SelectboxColumn("Tipo", options=tipos_oficiales, required=True),
-                    "Tomo": st.column_config.TextColumn("Tomo", required=True),
+                    "Subsistema": st.column_config.TextColumn("Subsistema", disabled=True), # BLOQUEO ANTI-ARRASTRE
+                    "Tipo": st.column_config.TextColumn("Tipo", disabled=True),             # BLOQUEO ANTI-ARRASTRE
+                    "Tomo": st.column_config.TextColumn("Tomo", disabled=True),             # BLOQUEO ANTI-ARRASTRE
                     "Subcontrato": st.column_config.SelectboxColumn("Subcontrato", options=empresas_oficiales, required=True),
                     "Responsable": st.column_config.TextColumn("Responsable", required=True),
                     "Estado": st.column_config.SelectboxColumn("Estado", options=estados_oficiales, required=True),
-                    "Fecha_Registro": st.column_config.TextColumn("Fecha", disabled=False), # DESBLOQUEADO PARA EDICIÓN MANUAL
+                    "Fecha_Registro": st.column_config.TextColumn("Fecha", disabled=False),
                     "Comentarios": st.column_config.TextColumn("Comentarios")
                 }
             )
@@ -229,21 +228,13 @@ else:
             col_save, col_empty, col_export = st.columns([2, 2, 1])
             
             with col_save:
-                if st.button("Sincronizar Cambios en Base Maestra", type="primary", use_container_width=True):
-                    # Forzar tipos para comparación segura
+                if st.button("Sincronizar Cambios Editados", type="primary", use_container_width=True):
                     df_editado_str = df_editado.fillna("").astype(str).replace(["nan", "None"], "")
                     hubo_cambios = False
                     
-                    # 1. PURGA DE REGISTROS MARCADOS
-                    filas_a_borrar = df_editado_str[df_editado_str["ELIMINAR"] == "True"].index
-                    if len(filas_a_borrar) > 0:
-                        df_limpio = df_limpio.drop(index=filas_a_borrar)
-                        hubo_cambios = True
-
-                    # 2. AUDITORÍA DE MODIFICACIONES DE CELDAS
                     for idx in df_editado_str.index:
-                        if idx not in filas_a_borrar and idx in df_limpio.index:
-                            fila_editada = df_editado_str.loc[idx].drop("ELIMINAR")
+                        if idx in df_limpio.index:
+                            fila_editada = df_editado_str.loc[idx]
                             fila_original = df_limpio.loc[idx]
                             
                             if not fila_original.equals(fila_editada):
@@ -252,16 +243,32 @@ else:
 
                     if hubo_cambios:
                         conn.update(data=df_limpio)
-                        st.success("Transacción ejecutada. Base de datos actualizada.")
+                        st.success("Cambios sincronizados en la base de datos.")
                         st.rerun()
                     else:
-                        st.info("Sin variaciones operativas detectadas.")
+                        st.info("No se detectaron modificaciones para guardar.")
                         
             with col_export:
-                # Ocultar columna de borrado al exportar
-                export_df = df_vis.drop(columns=["ELIMINAR"])
-                csv_data = export_df.to_csv(index=False, sep=";", encoding="utf-8-sig")
-                st.download_button("Exportar Matriz (CSV)", csv_data, f"Reporte_TOP_{datetime.now().strftime('%Y%m%d')}.csv", "text/csv", use_container_width=True)
+                csv_data = df_vis.to_csv(index=False, sep=";", encoding="utf-8-sig")
+                st.download_button("Exportar Vista (CSV)", csv_data, f"Reporte_TOP_{datetime.now().strftime('%Y%m%d')}.csv", "text/csv", use_container_width=True)
+
+            st.divider()
+
+            # --- ZONA DE PURGA (HARD DELETE) ---
+            st.write("### Zona de Eliminación de Registros")
+            st.warning("Seleccione el registro exacto a eliminar. Esta acción borrará la línea seleccionada de la base de datos maestra.")
+            
+            # Formateo legible de las opciones de eliminación
+            opciones_purga = df_vis.index.tolist()
+            formato_purga = lambda x: f"{df_vis.loc[x, 'Subsistema']} | Tipo: {df_vis.loc[x, 'Tipo']} | Tomo: {df_vis.loc[x, 'Tomo']} | Estado: {df_vis.loc[x, 'Estado']}"
+            
+            registro_a_borrar = st.selectbox("Registro a purgar:", opciones_purga, format_func=formato_purga)
+            
+            if st.button("ELIMINAR REGISTRO SELECCIONADO", type="primary"):
+                df_limpio = df_limpio.drop(index=registro_a_borrar)
+                conn.update(data=df_limpio)
+                st.success("Registro purgado exitosamente del sistema.")
+                st.rerun()
                 
         else:
             st.warning("No existen coincidencias de datos bajo los parámetros actuales.")
