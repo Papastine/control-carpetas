@@ -9,8 +9,16 @@ from st_keyup import st_keyup
 # -----------------------------------------------------------------------------
 st.set_page_config(page_title="Control TOP QA", layout="wide")
 
-st.title("Sistema de Control de Carpetas TOP")
-st.markdown("Plataforma de Auditoría y Trazabilidad Documental")
+st.markdown("""
+    <style>
+    .main .block-container { padding-top: 2rem; max-width: 98%; }
+    div[data-testid="stMetricValue"] { font-size: 1.8rem; font-weight: bold; }
+    div[data-testid="stMetricLabel"] { font-weight: 600; text-transform: uppercase; color: #555; }
+    </style>
+""", unsafe_allow_html=True)
+
+st.title("SISTEMA DE CONTROL DE CARPETAS TOP")
+st.caption("Plataforma Estricta de Auditoría y Trazabilidad Documental")
 st.divider()
 
 # -----------------------------------------------------------------------------
@@ -59,26 +67,26 @@ def cargar_datos():
 try:
     data = cargar_datos()
 except Exception as e:
-    st.error(f"Falla de conexión a la base de datos: {e}")
+    st.error(f"Falla crítica de conexión a la base de datos: {e}")
     st.stop()
 
 # -----------------------------------------------------------------------------
 # NAVEGACIÓN LATERAL
 # -----------------------------------------------------------------------------
 with st.sidebar:
-    st.header("Menú Principal")
-    modo = st.radio("Módulos:", ["1. Ingreso Documental", "2. Auditoría y Edición"])
+    st.header("Módulos de Operación")
+    modo = st.radio("Seleccione Acción:", ["01. Ingreso Documental", "02. Auditoría y Edición"])
     st.divider()
-    if st.button("Sincronizar Datos", use_container_width=True):
+    if st.button("Forzar Sincronización", use_container_width=True):
         st.rerun()
 
 # -----------------------------------------------------------------------------
 # MÓDULO 1: INGRESO DOCUMENTAL
 # -----------------------------------------------------------------------------
-if modo == "1. Ingreso Documental":
+if modo == "01. Ingreso Documental":
     
-    st.subheader("Registro de Lote")
-    st.caption("Complete los campos obligatorios para el ingreso. El sistema bloquea duplicados exactos automáticamente.")
+    st.subheader("Registro de Nuevo Lote")
+    st.caption("Complete los campos obligatorios. El motor de base de datos rechazará automáticamente ingresos duplicados.")
     
     with st.form("registro_form", clear_on_submit=True):
         col1, col2 = st.columns(2)
@@ -94,7 +102,7 @@ if modo == "1. Ingreso Documental":
             responsable = st.text_input("Responsable QA")
             estado = st.selectbox("Estado Operativo", estados_oficiales)
             
-        comentario = st.text_area("Observaciones", height=100)
+        comentario = st.text_area("Observaciones Adicionales", height=100)
             
         submit = st.form_submit_button("Guardar Registro", type="primary")
 
@@ -102,11 +110,11 @@ if modo == "1. Ingreso Documental":
         subsistema_final = subsistema_manual.strip().upper() if subsistema_sel == "OTRO (INGRESO MANUAL)" else subsistema_sel
         
         if not subsistema_final or not responsable or not tomo:
-            st.error("Campos obligatorios faltantes. Verifique los datos.")
+            st.error("Operación Abortada: Existen campos obligatorios vacíos.")
         else:
             df_base = data.dropna(subset=["Subsistema"]).fillna("").astype(str) if data is not None else pd.DataFrame()
             
-            # CONTROL DE DUPLICADOS ESTRICTO
+            # BLOQUEO DE DUPLICIDAD
             if not df_base.empty:
                 duplicado = df_base[
                     (df_base["Subsistema"] == subsistema_final) & 
@@ -117,7 +125,7 @@ if modo == "1. Ingreso Documental":
                 duplicado = pd.DataFrame()
 
             if not duplicado.empty:
-                st.error("Bloqueo de seguridad: El lote ingresado (Subsistema + Tipo + Tomo) ya se encuentra en la base de datos.")
+                st.error("Infracción de Integridad: Este lote (Subsistema, Tipo y Tomo) ya figura en los registros.")
             else:
                 nuevo_registro = pd.DataFrame([{
                     "Subsistema": subsistema_final,
@@ -131,7 +139,7 @@ if modo == "1. Ingreso Documental":
                 }])
                 df_actualizado = pd.concat([data.dropna(how="all"), nuevo_registro], ignore_index=True)
                 conn.update(data=df_actualizado)
-                st.success("Lote registrado correctamente.")
+                st.success("Lote ingresado exitosamente al repositorio maestro.")
                 st.rerun()
 
 # -----------------------------------------------------------------------------
@@ -141,37 +149,41 @@ else:
     df_limpio = data.dropna(subset=["Subsistema"]) if data is not None and not data.empty else pd.DataFrame()
     
     if df_limpio.empty:
-        st.info("La base de datos no contiene registros.")
+        st.info("El repositorio de datos se encuentra vacío.")
     else:
         df_limpio = df_limpio.fillna("").astype(str).replace(["nan", "None"], "")
         
-        # --- BUSCADOR PRINCIPAL (Tiempo Real) ---
-        st.subheader("Búsqueda Inmediata de Subsistema")
-        buscador_txt = st_keyup("Escriba el TAG para filtrar la tabla al instante:", key="buscador_ss")
+        # --- BUSCADOR TÁCTICO INMEDIATO ---
+        st.subheader("Buscador Maestro de Subsistemas")
+        buscador_txt = st_keyup("Filtro reactivo: Escriba el TAG para aislar el registro en la tabla inferior", key="buscador_ss")
         st.divider()
-        
-        # --- MÉTRICAS DE CONTROL ---
+
+        # --- PANEL MÉTRICO ---
         total_reg = len(df_limpio)
         total_ok = len(df_limpio[df_limpio["Estado"] == "OK"])
+        porcentaje_ok = int((total_ok / total_reg) * 100) if total_reg > 0 else 0
         
         c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Total Registros", total_reg)
+        c1.metric("Registros Totales", total_reg)
         c2.metric("Carpetas OK", total_ok)
         c3.metric("En Revisión QA", len(df_limpio[df_limpio["Estado"] == "En revision"]))
         c4.metric("Falta Escanear", len(df_limpio[df_limpio["Estado"] == "Falta escanear"]))
+
+        st.write(f"**Índice de Completitud General: {porcentaje_ok}%**")
+        st.progress(porcentaje_ok / 100.0)
         st.write("")
 
-        # --- FILTROS SECUNDARIOS ---
-        with st.expander("Filtros Adicionales (Estado, Empresa, Tipo)"):
+        # --- FILTROS DE VISTA SECUNDARIOS ---
+        with st.expander("Desplegar Filtros Secundarios (Estado, Empresa, Tipo)"):
             f_col1, f_col2, f_col3 = st.columns(3)
             with f_col1:
-                filtro_estado = st.selectbox("Estado", ["TODOS"] + estados_oficiales)
+                filtro_estado = st.selectbox("Filtrar por Estado", ["TODOS"] + estados_oficiales)
             with f_col2:
-                filtro_empresa = st.selectbox("Empresa", ["TODOS"] + empresas_oficiales)
+                filtro_empresa = st.selectbox("Filtrar por Empresa", ["TODOS"] + empresas_oficiales)
             with f_col3:
-                filtro_tipo = st.selectbox("Tipo", ["TODOS"] + tipos_oficiales)
+                filtro_tipo = st.selectbox("Filtrar por Tipo", ["TODOS"] + tipos_oficiales)
 
-        # ORDENAMIENTO Y APLICACIÓN DE FILTROS
+        # ORDENAMIENTO ALFANUMÉRICO Y APLICACIÓN DE FILTROS
         df_limpio = df_limpio.sort_values(by=["Subsistema", "Tipo", "Tomo"], ascending=[True, True, True]).reset_index(drop=True)
         df_vis = df_limpio.copy()
         
@@ -184,17 +196,21 @@ else:
         if filtro_tipo != "TODOS":
             df_vis = df_vis[df_vis["Tipo"] == filtro_tipo]
 
-        # --- PANEL DE EDICIÓN ---
-        st.subheader("Panel de Datos")
-        st.caption("Seleccione la casilla a la izquierda de la fila para resaltarla. Doble clic en una celda para editar.")
+        # --- INTERFAZ ERP: EDICIÓN Y ELIMINACIÓN ---
+        st.write("### Matriz de Auditoría de Datos")
+        st.info("Táctica de uso: Para modificar un valor, haga doble clic en la celda. Para **ELIMINAR** un registro, marque la casilla '[ 🗑️ BORRAR ]' y presione Sincronizar Cambios.")
         
         if not df_vis.empty:
+            # INYECCIÓN DE LA COLUMNA BOOLEANA DE ELIMINACIÓN ERP
+            df_vis.insert(0, "ELIMINAR", False)
+
             df_editado = st.data_editor(
                 df_vis,
                 use_container_width=True,
-                num_rows="fixed",
-                hide_index=False, # ESTA VARIABLE PERMITE SELECCIONAR Y RESALTAR LA FILA COMPLETA
+                num_rows="fixed", # IMPIDE FILAS FANTASMA
+                hide_index=True,  # OCULTA EL ÍNDICE NATIVO INÚTIL
                 column_config={
+                    "ELIMINAR": st.column_config.CheckboxColumn("🗑️ BORRAR", default=False, width="small"),
                     "Subsistema": st.column_config.SelectboxColumn("Subsistema", options=ss_master, required=True),
                     "Tipo": st.column_config.SelectboxColumn("Tipo", options=tipos_oficiales, required=True),
                     "Tomo": st.column_config.TextColumn("Tomo", required=True),
@@ -210,27 +226,41 @@ else:
             col_save, col_empty, col_export = st.columns([2, 2, 1])
             
             with col_save:
-                if st.button("Guardar Cambios Editados", type="primary", use_container_width=True):
-                    df_editado = df_editado.fillna("").astype(str).replace(["nan", "None"], "")
+                if st.button("Sincronizar Cambios en Base Maestra", type="primary", use_container_width=True):
+                    # Forzar tipos para comparación segura
+                    df_editado_str = df_editado.fillna("").astype(str).replace(["nan", "None"], "")
                     hubo_cambios = False
                     
-                    for idx in df_editado.index:
-                        if idx in df_limpio.index:
-                            if not df_limpio.loc[idx].equals(df_editado.loc[idx]):
-                                df_limpio.loc[idx] = df_editado.loc[idx]
+                    # 1. PURGA DE REGISTROS MARCADOS
+                    filas_a_borrar = df_editado_str[df_editado_str["ELIMINAR"] == "True"].index
+                    if len(filas_a_borrar) > 0:
+                        df_limpio = df_limpio.drop(index=filas_a_borrar)
+                        hubo_cambios = True
+
+                    # 2. AUDITORÍA DE MODIFICACIONES DE CELDAS
+                    for idx in df_editado_str.index:
+                        if idx not in filas_a_borrar and idx in df_limpio.index:
+                            # Aislamos la fila editada descartando la columna de eliminación
+                            fila_editada = df_editado_str.loc[idx].drop("ELIMINAR")
+                            fila_original = df_limpio.loc[idx]
+                            
+                            if not fila_original.equals(fila_editada):
+                                df_limpio.loc[idx] = fila_editada
                                 df_limpio.loc[idx, "Fecha_Registro"] = datetime.now().strftime("%Y-%m-%d %H:%M") + " (Editado)"
                                 hubo_cambios = True
 
                     if hubo_cambios:
                         conn.update(data=df_limpio)
-                        st.success("Cambios sincronizados en la base de datos.")
+                        st.success("Transacción ejecutada. Base de datos actualizada.")
                         st.rerun()
                     else:
-                        st.info("No se detectaron modificaciones para guardar.")
+                        st.info("Sin variaciones operativas detectadas.")
                         
             with col_export:
-                csv_data = df_vis.to_csv(index=False, sep=";", encoding="utf-8-sig")
-                st.download_button("Exportar Vista (CSV)", csv_data, f"Reporte_TOP_{datetime.now().strftime('%Y%m%d')}.csv", "text/csv", use_container_width=True)
+                # Se oculta la columna de eliminación antes de exportar
+                export_df = df_vis.drop(columns=["ELIMINAR"])
+                csv_data = export_df.to_csv(index=False, sep=";", encoding="utf-8-sig")
+                st.download_button("Exportar Matriz (CSV)", csv_data, f"Reporte_TOP_{datetime.now().strftime('%Y%m%d')}.csv", "text/csv", use_container_width=True)
                 
         else:
-            st.warning("No se encontraron coincidencias para la búsqueda.")
+            st.warning("No existen coincidencias de datos bajo los parámetros actuales.")
