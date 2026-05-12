@@ -5,7 +5,7 @@ from datetime import datetime
 from st_keyup import st_keyup
 
 # -----------------------------------------------------------------------------
-# CONFIGURACIÓN DE PÁGIN
+# CONFIGURACIÓN DE PÁGINA
 # -----------------------------------------------------------------------------
 st.set_page_config(page_title="Control TOP QA", layout="wide")
 
@@ -109,8 +109,8 @@ if modo == "01. Ingreso Documental":
             responsable = st.text_input("Responsable QA")
             estado = st.selectbox("Estado Operativo", estados_oficiales)
             
-            # Selector de fecha real de recepción
-            fecha_recepcion = st.date_input("Fecha de Recepción", datetime.today())
+            # Selector de fecha real de recepción forzado a formato DD/MM/YYYY
+            fecha_recepcion = st.date_input("Fecha de Recepción", datetime.today(), format="DD/MM/YYYY")
             
         comentario = st.text_area("Observaciones Adicionales", height=100)
             
@@ -144,7 +144,7 @@ if modo == "01. Ingreso Documental":
                     "Subcontrato": subcontrato,
                     "Responsable": str(responsable).strip().upper(),
                     "Estado": estado,
-                    "Fecha_Registro": fecha_recepcion.strftime("%Y-%m-%d"),
+                    "Fecha_Registro": fecha_recepcion.strftime("%d/%m/%Y"),
                     "Comentarios": str(comentario).strip()
                 }])
                 df_actualizado = pd.concat([data.dropna(how="all"), nuevo_registro], ignore_index=True)
@@ -211,7 +211,7 @@ else:
                 df_vis,
                 use_container_width=True,
                 num_rows="fixed",
-                hide_index=True,
+                hide_index=False, # Mantiene el índice nativo para resaltar fila
                 column_config={
                     "Subsistema": st.column_config.TextColumn("Subsistema", disabled=True), # BLOQUEO ANTI-ARRASTRE
                     "Tipo": st.column_config.TextColumn("Tipo", disabled=True),             # BLOQUEO ANTI-ARRASTRE
@@ -219,7 +219,7 @@ else:
                     "Subcontrato": st.column_config.SelectboxColumn("Subcontrato", options=empresas_oficiales, required=True),
                     "Responsable": st.column_config.TextColumn("Responsable", required=True),
                     "Estado": st.column_config.SelectboxColumn("Estado", options=estados_oficiales, required=True),
-                    "Fecha_Registro": st.column_config.TextColumn("Fecha", disabled=False),
+                    "Fecha_Registro": st.column_config.TextColumn("Fecha (DD/MM/YYYY)", disabled=False),
                     "Comentarios": st.column_config.TextColumn("Comentarios")
                 }
             )
@@ -239,6 +239,7 @@ else:
                             
                             if not fila_original.equals(fila_editada):
                                 df_limpio.loc[idx] = fila_editada
+                                df_limpio.loc[idx, "Fecha_Registro"] = fila_editada["Fecha_Registro"] + " (Editado)"
                                 hubo_cambios = True
 
                     if hubo_cambios:
@@ -250,7 +251,7 @@ else:
                         
             with col_export:
                 csv_data = df_vis.to_csv(index=False, sep=";", encoding="utf-8-sig")
-                st.download_button("Exportar Vista (CSV)", csv_data, f"Reporte_TOP_{datetime.now().strftime('%Y%m%d')}.csv", "text/csv", use_container_width=True)
+                st.download_button("Exportar Vista (CSV)", csv_data, f"Reporte_TOP_{datetime.now().strftime('%d%m%Y')}.csv", "text/csv", use_container_width=True)
 
             st.divider()
 
@@ -258,7 +259,6 @@ else:
             st.write("### Zona de Eliminación de Registros")
             st.warning("Seleccione el registro exacto a eliminar. Esta acción borrará la línea seleccionada de la base de datos maestra.")
             
-            # Formateo legible de las opciones de eliminación
             opciones_purga = df_vis.index.tolist()
             formato_purga = lambda x: f"{df_vis.loc[x, 'Subsistema']} | Tipo: {df_vis.loc[x, 'Tipo']} | Tomo: {df_vis.loc[x, 'Tomo']} | Estado: {df_vis.loc[x, 'Estado']}"
             
