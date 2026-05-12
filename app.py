@@ -5,7 +5,7 @@ from datetime import datetime
 from st_keyup import st_keyup
 
 # -----------------------------------------------------------------------------
-# CONFIGURACIÓN DE PÁGINA (Limpia y Nativa)
+# CONFIGURACIÓN DE PÁGINA (Limpia y Nativ
 # -----------------------------------------------------------------------------
 st.set_page_config(page_title="Control TOP QA", page_icon="📑", layout="wide")
 
