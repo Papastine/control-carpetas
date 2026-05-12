@@ -1,0 +1,10 @@
+[theme]
+# Forzar el modo claro (blancos) globalmente para todos los usuarios
+base = "light"
+
+# Colores corporativos inyectados nativamente para mantener coherencia
+primaryColor = "#004080"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F0F2F6"
+textColor = "#333333"
+font = "sans serif"
