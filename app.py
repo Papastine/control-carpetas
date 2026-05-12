@@ -86,7 +86,7 @@ with st.sidebar:
 # -----------------------------------------------------------------------------
 if modo == "01. Ingreso Documental":
     
-    st.subheader("Registro de Nuevo Lote")
+    st.subheader("Registrar carpeta fisica")
     st.caption("Complete los campos obligatorios. El motor de base de datos rechazará automáticamente ingresos duplicados.")
     
     with st.form("registro_form", clear_on_submit=True):
@@ -105,9 +105,9 @@ if modo == "01. Ingreso Documental":
             tomo = st.text_input("Tomo N° / Rango")
             
         with col2:
-            subcontrato = st.selectbox("Empresa Emisora", empresas_oficiales)
-            responsable = st.text_input("Responsable QA")
-            estado = st.selectbox("Estado Operativo", estados_oficiales)
+            subcontrato = st.selectbox("Subcontratista", empresas_oficiales)
+            responsable = st.text_input("Responsable Recepcion")
+            estado = st.selectbox("Estado Carpeta", estados_oficiales)
             
             # Selector de fecha real de recepción forzado a formato DD/MM/YYYY
             fecha_recepcion = st.date_input("Fecha de Recepción", datetime.today(), format="DD/MM/YYYY")
