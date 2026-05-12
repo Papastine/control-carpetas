@@ -5,95 +5,19 @@ from datetime import datetime
 from st_keyup import st_keyup
 
 # -----------------------------------------------------------------------------
-# CONFIGURACIÓN DE PÁGINA Y MOTOR CSS (Estilo ERP Industrial / SAP)
+# CONFIGURACIÓN DE PÁGINA
 # -----------------------------------------------------------------------------
-st.set_page_config(page_title="CONTROL TOP", layout="wide")
+st.set_page_config(page_title="Control TOP QA", layout="wide")
 
 st.markdown("""
     <style>
-    /* Reset de fuentes y fondos corporativos */
-    html, body, [class*="css"] {
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
-        font-size: 14px !important;
-    }
-    .stApp {
-        background-color: #EAEAEA;
-    }
-    
-    /* Contenedor principal estilo ventana de software */
-    .block-container {
-        padding-top: 1rem !important;
-        padding-bottom: 1rem !important;
-        max-width: 98% !important;
-        background-color: #FFFFFF;
-        border: 1px solid #A0A0A0;
-        box-shadow: 2px 2px 0px rgba(0,0,0,0.2);
-    }
-    
-    /* Encabezados estrictos */
-    h1 {
-        background-color: #004080;
-        color: #FFFFFF !important;
-        font-size: 1.2rem !important;
-        padding: 8px 12px !important;
-        text-transform: uppercase;
-        margin-bottom: 15px !important;
-        border: 1px solid #002244;
-    }
-    h2, h3 {
-        color: #333333 !important;
-        font-weight: bold !important;
-        text-transform: uppercase;
-        font-size: 1rem !important;
-        border-bottom: 2px solid #004080;
-        padding-bottom: 2px;
-        margin-top: 15px !important;
-        margin-bottom: 10px !important;
-    }
-    
-    /* Eliminación de bordes redondeados (Brutalismo UI) */
-    div[data-baseweb="input"] > div,
-    div[data-baseweb="select"] > div,
-    textarea, 
-    div[data-testid="stExpander"] {
-        border-radius: 0px !important;
-        border: 1px solid #888888 !important;
-        background-color: #F9F9F9 !important;
-    }
-    
-    /* Estilo de Botones ERP */
-    button {
-        border-radius: 0px !important;
-        text-transform: uppercase;
-        font-weight: bold !important;
-        border: 1px solid #555555 !important;
-    }
-    button[kind="primary"] {
-        background-color: #004080 !important;
-        color: #FFFFFF !important;
-        border-color: #002244 !important;
-    }
-    
-    /* Panel Lateral (Sidebar) */
-    [data-testid="stSidebar"] {
-        background-color: #D4D0C8 !important;
-        border-right: 2px solid #888888;
-    }
-    
-    /* Tarjetas de Métricas */
-    div[data-testid="stMetric"] {
-        background-color: #FFFFFF;
-        border: 1px solid #A0A0A0;
-        border-left: 5px solid #004080;
-        padding: 5px 10px;
-        border-radius: 0px;
-    }
-    div[data-testid="stMetricLabel"] { font-weight: bold; color: #333; }
-    div[data-testid="stMetricValue"] { font-family: 'Courier New', monospace; font-size: 1.5rem !important; color: #000; }
+    .main .block-container { padding-top: 2rem; max-width: 98%; }
     </style>
 """, unsafe_allow_html=True)
 
-st.title("SISTEMA DE CONTROL DOCUMENTAL TOP - QA")
+st.title("Sistema de Control de Carpetas TOP")
+st.caption("Plataforma Estricta de Auditoría y Trazabilidad Documental")
+st.divider()
 
 # -----------------------------------------------------------------------------
 # MATRIZ DE SUBSISTEMAS ESTANDARIZADA
@@ -131,7 +55,7 @@ empresas_oficiales = ["TECHINT", "IDE", "BELFI", "Syncore"]
 tipos_oficiales = ["CRP", "PRECOM"]
 
 # -----------------------------------------------------------------------------
-# CONEXIÓN BASE DE DATOS
+# CONEXIÓN A BASE DE DATOS
 # -----------------------------------------------------------------------------
 conn = st.connection("gsheets", type=GSheetsConnection)
 
@@ -141,61 +65,63 @@ def cargar_datos():
 try:
     data = cargar_datos()
 except Exception as e:
-    st.error(f"ERROR CRÍTICO DB: {e}")
+    st.error(f"Falla crítica de conexión a la base de datos: {e}")
     st.stop()
 
 # -----------------------------------------------------------------------------
 # NAVEGACIÓN LATERAL
 # -----------------------------------------------------------------------------
 with st.sidebar:
-    st.subheader("TRANSACCIONES")
-    modo = st.radio("SELECCIONE MÓDULO:", ["01. INGRESO DOCUMENTAL", "02. AUDITORÍA Y EDICIÓN"])
-    st.markdown("---")
-    if st.button("ACTUALIZAR DATOS (F5)", use_container_width=True):
+    st.header("Módulos de Operación")
+    modo = st.radio("Seleccione Acción:", ["01. Ingreso Documental", "02. Auditoría y Edición"])
+    st.divider()
+    if st.button("Forzar Sincronización", use_container_width=True):
         st.rerun()
 
 # -----------------------------------------------------------------------------
-# MÓDULO 01: INGRESO DOCUMENTAL
+# MÓDULO 1: INGRESO DOCUMENTAL
 # -----------------------------------------------------------------------------
-if modo == "01. INGRESO DOCUMENTAL":
+if modo == "01. Ingreso Documental":
     
-    st.subheader("TRANSACCIÓN: REGISTRO DE LOTE")
+    st.subheader("Registro de Nuevo Lote")
+    st.caption("Complete los campos obligatorios. El motor de base de datos rechazará automáticamente ingresos duplicados.")
     
     with st.form("registro_form", clear_on_submit=True):
         col1, col2 = st.columns(2)
         
         with col1:
-            subsistema_sel = st.selectbox("ID SUBSISTEMA", ss_master)
+            subsistema_sel = st.selectbox("ID Subsistema", ss_master)
             
-            # Compuerta lógica: Solo se despliega si es requerido
+            # Compuerta lógica: Solo despliega input manual si se requiere
             if subsistema_sel == "OTRO (INGRESO MANUAL)":
-                subsistema_manual = st.text_input("INGRESO MANUAL DE SUBSISTEMA")
+                subsistema_manual = st.text_input("Ingreso Manual de Subsistema")
             else:
                 subsistema_manual = ""
                 
-            tipo = st.selectbox("CATEGORÍA DOCUMENTAL", tipos_oficiales)
-            tomo = st.text_input("TOMO N° / RANGO")
+            tipo = st.selectbox("Categoría Documental", tipos_oficiales)
+            tomo = st.text_input("Tomo N° / Rango")
             
         with col2:
-            subcontrato = st.selectbox("EMPRESA EMISORA", empresas_oficiales)
-            responsable = st.text_input("RESPONSABLE QA")
-            estado = st.selectbox("ESTADO OPERATIVO", estados_oficiales)
-            # Input de fecha real de recepción física
-            fecha_recepcion = st.date_input("FECHA DE RECEPCIÓN", datetime.today())
+            subcontrato = st.selectbox("Empresa Emisora", empresas_oficiales)
+            responsable = st.text_input("Responsable QA")
+            estado = st.selectbox("Estado Operativo", estados_oficiales)
             
-        comentario = st.text_area("OBSERVACIONES / NOTAS", height=80)
+            # Selector de fecha real de recepción
+            fecha_recepcion = st.date_input("Fecha de Recepción", datetime.today())
             
-        submit = st.form_submit_button("CONTABILIZAR REGISTRO", type="primary")
+        comentario = st.text_area("Observaciones Adicionales", height=100)
+            
+        submit = st.form_submit_button("Guardar Registro", type="primary")
 
     if submit:
         subsistema_final = subsistema_manual.strip().upper() if subsistema_sel == "OTRO (INGRESO MANUAL)" else subsistema_sel
         
         if not subsistema_final or not responsable or not tomo:
-            st.error("ERROR: CAMPOS OBLIGATORIOS FALTANTES.")
+            st.error("Operación Abortada: Existen campos obligatorios vacíos.")
         else:
             df_base = data.dropna(subset=["Subsistema"]).fillna("").astype(str) if data is not None else pd.DataFrame()
             
-            # CONTROL DE DUPLICIDAD
+            # BLOQUEO DE DUPLICIDAD
             if not df_base.empty:
                 duplicado = df_base[
                     (df_base["Subsistema"] == subsistema_final) & 
@@ -206,7 +132,7 @@ if modo == "01. INGRESO DOCUMENTAL":
                 duplicado = pd.DataFrame()
 
             if not duplicado.empty:
-                st.error("ERROR: LOTE DUPLICADO. EL SUBSISTEMA, TIPO Y TOMO YA EXISTEN EN LA BASE DE DATOS.")
+                st.error("Infracción de Integridad: Este lote (Subsistema, Tipo y Tomo) ya figura en los registros.")
             else:
                 nuevo_registro = pd.DataFrame([{
                     "Subsistema": subsistema_final,
@@ -220,47 +146,47 @@ if modo == "01. INGRESO DOCUMENTAL":
                 }])
                 df_actualizado = pd.concat([data.dropna(how="all"), nuevo_registro], ignore_index=True)
                 conn.update(data=df_actualizado)
-                st.success("STATUS: REGISTRO COMPLETADO CORRECTAMENTE.")
+                st.success("Lote ingresado exitosamente al repositorio maestro.")
                 st.rerun()
 
 # -----------------------------------------------------------------------------
-# MÓDULO 02: AUDITORÍA Y EDICIÓN
+# MÓDULO 2: AUDITORÍA Y EDICIÓN
 # -----------------------------------------------------------------------------
 else:
     df_limpio = data.dropna(subset=["Subsistema"]) if data is not None and not data.empty else pd.DataFrame()
     
     if df_limpio.empty:
-        st.info("STATUS: SIN DATOS EN EL REPOSITORIO.")
+        st.info("El repositorio de datos se encuentra vacío.")
     else:
         df_limpio = df_limpio.fillna("").astype(str).replace(["nan", "None"], "")
         
-        # --- PANEL DE CONTROL ---
-        st.subheader("CUADRO DE MANDO Y ESTADÍSTICAS")
-        
+        # --- BUSCADOR TÁCTICO INMEDIATO ---
+        st.subheader("Buscador de Subsistemas")
+        buscador_txt = st_keyup("Escriba el Subsistema para filtrar la tabla al instante:", key="buscador_ss")
+        st.divider()
+
+        # --- PANEL MÉTRICO ---
         total_reg = len(df_limpio)
         total_ok = len(df_limpio[df_limpio["Estado"] == "OK"])
-
+        
         c1, c2, c3, c4 = st.columns(4)
-        c1.metric("REGISTROS TOTALES", total_reg)
-        c2.metric("VOLUMEN 'OK'", total_ok)
-        c3.metric("EN REVISIÓN QA", len(df_limpio[df_limpio["Estado"] == "En revision"]))
-        c4.metric("PENDIENTE ESCANEO", len(df_limpio[df_limpio["Estado"] == "Falta escanear"]))
+        c1.metric("Registros Totales", total_reg)
+        c2.metric("Carpetas OK", total_ok)
+        c3.metric("En Revisión QA", len(df_limpio[df_limpio["Estado"] == "En revision"]))
+        c4.metric("Falta Escanear", len(df_limpio[df_limpio["Estado"] == "Falta escanear"]))
+        st.write("")
 
-        # --- MOTOR DE FILTRADO MULTIVARIABLE ---
-        st.subheader("FILTRADO DE VISTA")
-        
-        f_col1, f_col2, f_col3, f_col4 = st.columns([2, 1, 1, 1])
-        
-        with f_col1:
-            buscador_txt = st_keyup("BUSCAR SUBSISTEMA", key="buscador_ss", placeholder="Ingrese valor...")
-        with f_col2:
-            filtro_estado = st.selectbox("FILTRO ESTADO", ["TODOS"] + estados_oficiales)
-        with f_col3:
-            filtro_empresa = st.selectbox("FILTRO EMPRESA", ["TODOS"] + empresas_oficiales)
-        with f_col4:
-            filtro_tipo = st.selectbox("FILTRO TIPO", ["TODOS"] + tipos_oficiales)
+        # --- FILTROS DE VISTA SECUNDARIOS ---
+        with st.expander("Filtros Adicionales (Estado, Empresa, Tipo)"):
+            f_col1, f_col2, f_col3 = st.columns(3)
+            with f_col1:
+                filtro_estado = st.selectbox("Filtrar por Estado", ["TODOS"] + estados_oficiales)
+            with f_col2:
+                filtro_empresa = st.selectbox("Filtrar por Empresa", ["TODOS"] + empresas_oficiales)
+            with f_col3:
+                filtro_tipo = st.selectbox("Filtrar por Tipo", ["TODOS"] + tipos_oficiales)
 
-        # ORDENAMIENTO ESTRICTO Y FILTRADO
+        # ORDENAMIENTO ALFANUMÉRICO Y APLICACIÓN DE FILTROS
         df_limpio = df_limpio.sort_values(by=["Subsistema", "Tipo", "Tomo"], ascending=[True, True, True]).reset_index(drop=True)
         df_vis = df_limpio.copy()
         
@@ -273,34 +199,38 @@ else:
         if filtro_tipo != "TODOS":
             df_vis = df_vis[df_vis["Tipo"] == filtro_tipo]
 
-        # --- VISTA DE DATOS ---
-        st.subheader("TRANSACCIÓN: MODIFICACIÓN DE REGISTROS")
+        # --- INTERFAZ ERP: EDICIÓN Y ELIMINACIÓN ---
+        st.write("### Matriz de Auditoría de Datos")
+        st.info("Para modificar un valor, haga doble clic en la celda. Para **ELIMINAR** un registro, marque la casilla '[ 🗑️ BORRAR ]' y presione Sincronizar Cambios.")
         
         if not df_vis.empty:
+            # INYECCIÓN DE LA COLUMNA BOOLEANA DE ELIMINACIÓN
             df_vis.insert(0, "ELIMINAR", False)
 
             df_editado = st.data_editor(
                 df_vis,
                 use_container_width=True,
                 num_rows="fixed",
-                hide_index=True,
+                hide_index=False, # SE MANTIENE EL ÍNDICE NATIVO PARA PERMITIR RESALTADO DE FILA
                 column_config={
                     "ELIMINAR": st.column_config.CheckboxColumn("🗑️ BORRAR", default=False, width="small"),
-                    "Subsistema": st.column_config.SelectboxColumn("SUBSISTEMA", options=ss_master, required=True),
-                    "Tipo": st.column_config.SelectboxColumn("TIPO", options=tipos_oficiales, required=True),
-                    "Tomo": st.column_config.TextColumn("TOMO", required=True),
-                    "Subcontrato": st.column_config.SelectboxColumn("SUBCONTRATO", options=empresas_oficiales, required=True),
-                    "Responsable": st.column_config.TextColumn("RESPONSABLE", required=True),
-                    "Estado": st.column_config.SelectboxColumn("ESTADO", options=estados_oficiales, required=True),
-                    "Fecha_Registro": st.column_config.TextColumn("FECHA RECEPCIÓN", disabled=False),
-                    "Comentarios": st.column_config.TextColumn("COMENTARIOS")
+                    "Subsistema": st.column_config.SelectboxColumn("Subsistema", options=ss_master, required=True),
+                    "Tipo": st.column_config.SelectboxColumn("Tipo", options=tipos_oficiales, required=True),
+                    "Tomo": st.column_config.TextColumn("Tomo", required=True),
+                    "Subcontrato": st.column_config.SelectboxColumn("Subcontrato", options=empresas_oficiales, required=True),
+                    "Responsable": st.column_config.TextColumn("Responsable", required=True),
+                    "Estado": st.column_config.SelectboxColumn("Estado", options=estados_oficiales, required=True),
+                    "Fecha_Registro": st.column_config.TextColumn("Fecha", disabled=False), # DESBLOQUEADO PARA EDICIÓN MANUAL
+                    "Comentarios": st.column_config.TextColumn("Comentarios")
                 }
             )
 
+            st.write("")
             col_save, col_empty, col_export = st.columns([2, 2, 1])
             
             with col_save:
-                if st.button("EJECUTAR SINCRONIZACIÓN", type="primary", use_container_width=True):
+                if st.button("Sincronizar Cambios en Base Maestra", type="primary", use_container_width=True):
+                    # Forzar tipos para comparación segura
                     df_editado_str = df_editado.fillna("").astype(str).replace(["nan", "None"], "")
                     hubo_cambios = False
                     
@@ -322,15 +252,16 @@ else:
 
                     if hubo_cambios:
                         conn.update(data=df_limpio)
-                        st.success("STATUS: SINCRONIZACIÓN EXITOSA. REPOSITORIO ACTUALIZADO.")
+                        st.success("Transacción ejecutada. Base de datos actualizada.")
                         st.rerun()
                     else:
-                        st.info("STATUS: NO SE DETECTARON VARIACIONES.")
+                        st.info("Sin variaciones operativas detectadas.")
                         
             with col_export:
+                # Ocultar columna de borrado al exportar
                 export_df = df_vis.drop(columns=["ELIMINAR"])
                 csv_data = export_df.to_csv(index=False, sep=";", encoding="utf-8-sig")
-                st.download_button("EXPORTAR DATOS (CSV)", csv_data, f"EXPORT_TOP_{datetime.now().strftime('%Y%m%d')}.csv", "text/csv", use_container_width=True)
+                st.download_button("Exportar Matriz (CSV)", csv_data, f"Reporte_TOP_{datetime.now().strftime('%Y%m%d')}.csv", "text/csv", use_container_width=True)
                 
         else:
-            st.warning("STATUS: NO EXISTEN COINCIDENCIAS PARA LOS CRITERIOS DE BÚSQUEDA.")
+            st.warning("No existen coincidencias de datos bajo los parámetros actuales.")
