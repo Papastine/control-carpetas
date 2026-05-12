@@ -5,7 +5,7 @@ from datetime import datetime
 from st_keyup import st_keyup
 
 # -----------------------------------------------------------------------------
-# CONFIGURACIÓN DE PÁGINA
+# CONFIGURACIÓN DE PÁGIN
 # -----------------------------------------------------------------------------
 st.set_page_config(page_title="Control TOP QA", layout="wide")
 
